@@ -13,7 +13,46 @@ class Blog:
         self.posts = []  # List of Post objects
         self.next_post_code = 1  # Auto-increment post code
 
+    def create_post(self, title: str, text: str):
+        """Creates and returns a new Post with auto-incremented code."""
+        from blogging.post import Post
+        post = Post(self.next_post_code, title, text)
+        self.posts.append(post)
+        self.next_post_code += 1
+        return post
 
+    def search_post(self, code: int):
+        """Returns the post with the given code or None."""
+        for post in self.posts:
+            if post.code == code:
+                return post
+        return None
+
+    def retrieve_posts(self, keyword: str):
+        """Returns a list of posts where keyword is in title or text."""
+        return [p for p in self.posts if keyword in p.title or keyword in p.text]
+
+    def update_post(self, code: int, new_title: str, new_text: str):
+        """Updates the post with the given code."""
+        post = self.search_post(code)
+        if post:
+            post.title = new_title
+            post.text = new_text
+            post.update_timestamp()
+            return True
+        return False
+
+    def delete_post(self, code: int):
+        """Deletes the post with the given code."""
+        post = self.search_post(code)
+        if post:
+            self.posts.remove(post)
+            return True
+        return False
+
+    def list_posts(self):
+        """Returns a list of posts from newest to oldest."""
+        return list(reversed(self.posts))
 
     def __eq__(self, other):
         """Two blogs are equal if all attributes match."""
