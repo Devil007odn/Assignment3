@@ -95,6 +95,11 @@ class Controller:
             return None
         return self.current_blog.search_post(code)
     
+    def retrieve_posts(self, keyword: str):
+        if not self.current_blog:
+            return None
+        return self.current_blog.retrieve_posts(keyword)
+    
     def update_post(self, code: int, title: str, text: str):
         if not self.logged_in or not self.current_blog:
             return False
@@ -104,3 +109,8 @@ class Controller:
         if not self.logged_in or not self.current_blog:
             return False
         return self.current_blog.delete_post(code)
+    
+    def list_posts(self):
+        if not self.current_blog:
+            return None
+        return self.current_blog.list_posts()
