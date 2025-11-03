@@ -94,3 +94,13 @@ class Controller:
         if not self.current_blog:
             return None
         return self.current_blog.search_post(code)
+    
+    def update_post(self, code: int, title: str, text: str):
+        if not self.logged_in or not self.current_blog:
+            return False
+        return self.current_blog.update_post(code, title, text)
+
+    def delete_post(self, code: int):
+        if not self.logged_in or not self.current_blog:
+            return False
+        return self.current_blog.delete_post(code)
