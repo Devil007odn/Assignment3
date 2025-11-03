@@ -1,3 +1,0 @@
-
-
-class BlogTest(unittest.TestCase):

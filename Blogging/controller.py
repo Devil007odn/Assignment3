@@ -31,4 +31,3 @@ class Controller:
         blog = Blog(blog_id, name, url, email)
         self.blogs[blog_id] = blog
         return blog
-
