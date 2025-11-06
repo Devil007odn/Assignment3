@@ -14,7 +14,7 @@ class Blog:
         self.next_post_code = 1  # Auto-increment post code
 
     def __repr__(self):
-        return f"Post(code={self.code}, title='{self.title}')"    
+        return f"Post(id={self.code}, title='{self.title}')"    
 
     def create_post(self, title: str, text: str):
         """Creates and returns a new Post with auto-incremented code."""
