@@ -12,11 +12,11 @@ class Post:
         self.creation = datetime.now()
         self.update = self.creation
 
-    def __repr__(self):
-        return f"Post(code={self.code}, title='{self.title}')"
-
     def update_timestamp(self):
         self.update = datetime.now()
+
+    def __repr__(self):
+        return f"Post(code={self.code}, title='{self.title}')"
 
     def __eq__(self, other):
         if not isinstance(other, Post):

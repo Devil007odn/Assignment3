@@ -41,5 +41,16 @@ class BlogTest(unittest.TestCase):
         self.assertEqual(posts[0].title, "B")  # reversed order
         self.assertEqual(posts[1].title, "A")
 
+    def test_blog_equality(self):
+        blog1 = Blog(1, "Travel", "travel.com", "travel@mail.com")
+        blog2 = Blog(1, "Travel", "travel.com", "travel@mail.com")
+        blog3 = Blog(2, "Food", "food.com", "food@mail.com")
+        self.assertEqual(blog1, blog2)
+        self.assertNotEqual(blog1, blog3)
+
+    def test_blog_str(self):
+        blog = Blog(1, "Travel", "travel.com", "travel@mail.com")
+        self.assertIn("Blog(id=1, name='Travel'", str(blog))
+
 if __name__ == '__main__':
     unittest.main()
