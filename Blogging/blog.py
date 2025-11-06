@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from blogging.post import Post
 class Blog:
     """
     Represents a blog with id, name, url, email, and a list of posts.
@@ -14,11 +14,11 @@ class Blog:
         self.next_post_code = 1  # Auto-increment post code
 
     def __repr__(self):
-        return f"Blog(id={self.code}, title='{self.title}')"    
+        return f"Blog(id={self.id}, name='{self.name}')"    
 
     def create_post(self, title: str, text: str):
         """Creates and returns a new Post with auto-incremented code."""
-        from blogging.post import Post
+
         post = Post(self.next_post_code, title, text)
         self.posts.append(post)
         self.next_post_code += 1
