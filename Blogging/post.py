@@ -1,38 +1,31 @@
-from datetime import datetime
+import datetime
 
-class Post:
-    """
-    Represents a blog post with code, title, text, and timestamps.
-    """
+class Post():
+    ''' class that represents a post '''
 
-    def __init__(self, code: int, title: str, text: str):
-        """ Initializes a new post with a unique code, title, and text """
-        self.code = code
-        self.title = title
-        self.text = text
-        """ Automatically sets creation and update timestamps to current time """
-        self.creation = datetime.now()
-        self.update = self.creation
+    def __init__(self, post_code, post_title, post_text):
+        ''' constructs a post '''
+        self.post_code = post_code
+        self.post_title = post_title
+        self.post_text = post_text
+        now = datetime.datetime.now()
+        self.creation_time = now
+        self.update_time = now
 
-    def __repr__(self):
-        """ String representation of the post, useful for developers """
-        return f"Post(code={self.code}, title='{self.title}')"
-
-    def update_timestamp(self):
-        """ Refresh the update timestamp to the current time 
-            Called whenever the post is modified """
-        self.update = datetime.now()
+    def update(self, new_post_title, new_post_text):
+        ''' update post post_title and post_text '''
+        self.post_title = new_post_title
+        self.post_text = new_post_text
+        self.update_time = datetime.datetime.now()	
 
     def __eq__(self, other):
-        """ Compare the content of a post with another post 
-            Returns true if the code, title, and text are the same """
-        if not isinstance(other, Post):
-            return False
-        return (self.code == other.code and
-                self.title == other.title and
-                self.text == other.text)
+        ''' checks whether this post is the same as other post '''
+        return self.post_code == other.post_code and self.post_title == other.post_title and self.post_text == other.post_text
 
     def __str__(self):
-        """ String representation of the post, useful for users
-            Returns a concise 20-character summary of the post """
-        return f"Post(code={self.code}, title='{self.title}', text='{self.text[:20]}...')"
+        ''' converts the post object to a string representation '''
+        return str(self.post_code) + "; " + str(self.creation_time) + "; " + str(self.update_time) + "\n" + str(self.post_title) + "\n\n" + self.post_text
+
+    def __repr__(self):
+        ''' converts the post object to a string representation for debugging '''
+        return "Post(%r, %r, %r,\n%r,\n\n%r\n)" % (self.post_code, self.creation_time, self.update_time, self.post_title, self.post_text)

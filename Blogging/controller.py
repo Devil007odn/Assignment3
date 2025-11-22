@@ -1,156 +1,240 @@
+import hashlib
+import os
 from blogging.blog import Blog
+from blogging.post import Post
+from blogging.configuration import Configuration
+from blogging.dao.blog_dao_json import BlogDAOJSON
+from blogging.exception.invalid_login_exception import InvalidLoginException
+from blogging.exception.duplicate_login_exception import DuplicateLoginException
+from blogging.exception.invalid_logout_exception import InvalidLogoutException
+from blogging.exception.illegal_access_exception import IllegalAccessException
+from blogging.exception.illegal_operation_exception import IllegalOperationException
+from blogging.exception.no_current_blog_exception import NoCurrentBlogException
 
-class Controller:
-    """
-    Handles user stories for the blogging system.
-    """
+class Controller():
+    ''' controller class that receives the system's operations '''
 
-    def __init__(self):
-        """ Initializes the controller with the default state """
-        self.logged_in = False
-        self.blogs = {}  # id -> Blog
+    def __init__(self, autosave=False):
+        ''' construct a controller class '''
+        self.autosave = autosave or Configuration.autosave
+        self.users = {}
+        self.load_users()
+        self.username = None
+        self.password_hash = None
+        self.logged = False
+        
+        self.blog_dao = BlogDAOJSON()
         self.current_blog = None
 
-    def login(self, username: str, password: str) -> bool:
-        """ Log in a user if valid credentials are provided
-            Must enter username and password """
-        if self.logged_in:
-            return False
-        if username == "user" and password == "blogging2025":
-            self.logged_in = True
-            return True
-        return False
 
-    def logout(self) -> bool:
-        """ If user is not logged in the logout fails 
-            else the current user is logged out"""
-        if not self.logged_in:
-            return False
-        self.logged_in = False
+
+    def load_users(self):
+        ''' Load users from users.txt file '''
+        try:
+            with open(Configuration.users_file, 'r') as file:
+                for line in file:
+                    line = line.strip()
+                    if line:  # Skip empty lines
+                        username, password_hash = line.split(',')
+                        self.users[username] = password_hash
+        except FileNotFoundError:
+            # If file doesn't exist, start with empty users
+            self.users = {}
+
+
+    def password_hash(self, password):
+        encoded_password = password.encode('utf-8')     
+        hash_object = hashlib.sha256(encoded_password)      
+        hex_dig = hash_object.hexdigest()       
+        return hex_dig
+
+    def login(self, username, password):
+        ''' user logs in the system '''
+        if self.logged:
+            raise DuplicateLoginException("User already logged in")
+        
+        if username not in self.users:
+            raise InvalidLoginException("Invalid username")
+        
+        # Hash the provided password and compare with stored hash
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        if password_hash != self.users[username]:
+            raise InvalidLoginException("Invalid password")
+            
+        self.username = username
+        self.password_hash = password_hash
+        self.logged = True
+        return True
+
+    def logout(self):
+        ''' user logs out from the system '''
+        if not self.logged:
+            raise InvalidLogoutException("No user is currently logged in")
+            
+        self.username = None
+        self.password_hash = None
+        self.logged = False
         self.current_blog = None
         return True
 
-    def create_blog(self, blog_id: int, name: str, url: str, email: str):
-        """ Create a new blog and add it to the controllers blog section 
-            If the user is logged in and the blog ID does not exist, a 
-            new blog is created """
-        if not self.logged_in or blog_id in self.blogs:
-            return None
-        blog = Blog(blog_id, name, url, email)
-        self.blogs[blog_id] = blog
+    def search_blog(self, blog_id):
+        ''' user searches a blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to search blogs")
+            
+        return self.blog_dao.search_blog(blog_id)
+
+    def create_blog(self, blog_id, blog_name, blog_url, blog_email):
+        ''' user creates a blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to create blogs")
+        
+        blog = Blog(blog_id, blog_name, blog_url, blog_email)
+        success = self.blog_dao.create_blog(blog)
+        if not success:
+            raise IllegalOperationException("Blog ID already exists")
         return blog
-    
 
-    def search_blog(self, blog_id: int):
-        """ Search for a blog by it's ID (Will be unique to the specific blog) 
-            Returns none if blog ID is not found """
-        return self.blogs.get(blog_id)
+    def retrieve_blogs(self, search_term):
+        ''' user retrieves the blogs that satisfy a search_term '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to retrieve blogs")
+            
+        return self.blog_dao.retrieve_blogs(search_term)
 
-    def retrieve_blogs(self, keyword: str):
-        """ Retrieve all blogs that have the given keyword
-            (searched name) in the blogs name.
-            Checks to make sure user is logged in """
-        if not self.logged_in:
-            return None
-        return [b for b in self.blogs.values() if keyword in b.name]
-
-    def update_blog(self, old_id: int, new_id: int, name: str, url: str, email: str):
-        """ Update the properties of an existing blog
-            Returns true if update was successful and false if it wasn't """
-        if not self.logged_in or old_id not in self.blogs:
-            return False
-        if new_id != old_id and new_id in self.blogs:
-            return False
-        if self.current_blog and self.current_blog.id == old_id:
-            return False
-        blog = self.blogs.pop(old_id)
-        blog.id = new_id
-        blog.name = name
-        blog.url = url
-        blog.email = email
-        self.blogs[new_id] = blog
-        if self.current_blog == blog:
-            self.current_blog = blog
+    def update_blog(self, original_blog_id, blog_id, blog_name, blog_url, blog_email):
+        ''' user updates a blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to update blogs")
+        
+        blog = self.blog_dao.search_blog(original_blog_id)
+        if not blog:
+            raise IllegalOperationException("Blog not found")
+            
+        if self.current_blog and blog == self.current_blog:
+            raise IllegalOperationException("Cannot update current blog")
+        
+        # Update blog fields
+        blog.name = blog_name
+        blog.url = blog_url
+        blog.email = blog_email
+        
+        # Handle ID change
+        if original_blog_id != blog_id:
+            if self.blog_dao.search_blog(blog_id):
+                raise IllegalOperationException("New blog ID already exists")
+            self.blog_dao.delete_blog(original_blog_id)
+            blog.id = blog_id
+            self.blog_dao.create_blog(blog)
+        else:
+            self.blog_dao.update_blog(original_blog_id, blog)
+            
         return True
+            
+    def delete_blog(self, blog_id):
+        ''' user deletes a blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to delete blogs")
+            
+        blog = self.blog_dao.search_blog(blog_id)
+        if not blog:
+            raise IllegalOperationException("Blog not found")
+            
+        if self.current_blog and blog == self.current_blog:
+            raise IllegalOperationException("Cannot delete current blog")
+            
+        return self.blog_dao.delete_blog(blog_id)
 
-    def delete_blog(self, blog_id: int):
-        """ Delete a blog from the system if the blog exists and the user is logged in.
-            If the blog is the current_blog, blog is not deleted """
-        if not self.logged_in or blog_id not in self.blogs:
-            return False
-        blog = self.blogs[blog_id]
-        if blog == self.current_blog:
-            return False
-        del self.blogs[blog_id]
-        return True
-    
     def list_blogs(self):
-        """ Return all blogs currently stored in controller 
-            Checks to see if the user is currently logged in """
-        if not self.logged_in:
-            return None
-        return list(self.blogs.values())
+        ''' user lists all blogs '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to list blogs")
+            
+        return self.blog_dao.list_blogs()
 
-    def set_current_blog(self, blog_id: int):
-        """ Select a blog as the current working blog with the blog ID
-            Checks to see if the user is currently logged in """
-        if not self.logged_in or blog_id not in self.blogs:
-            return
-        self.current_blog = self.blogs[blog_id]
+    def set_current_blog(self, blog_id):
+        ''' user sets the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to set current blog")
+            
+        blog = self.blog_dao.search_blog(blog_id)
+        if not blog:
+            raise IllegalOperationException("Blog not found")
+            
+        self.current_blog = blog
+        return True
 
     def get_current_blog(self):
-        """ Returns the currently selected blog
-            Returns none if not logged in or no blog is selected """
-        if not self.logged_in:
-            return None
+        ''' get the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to get current blog")
+            
         return self.current_blog
 
     def unset_current_blog(self):
-        """ Sets the currently selected blog to none """
+        ''' unset the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to unset current blog")
+            
         self.current_blog = None
+        return True
 
-    def create_post(self, title: str, text: str):
-        """ Create a new post inside the current blog
-            Checks to make sure the user is logged in and the
-            user has a blog selected """
-        if not self.logged_in or not self.current_blog:
-            return None
-        return self.current_blog.create_post(title, text)
-
-    def search_post(self, code: int):
-        """ Search for a post using its code inside current blog
-            Checks to make sure we are in the current_blog """
+    def search_post(self, post_code):
+        ''' user searches a post from the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to search posts")
+            
         if not self.current_blog:
-            return None
-        return self.current_blog.search_post(code)
-    
-    def retrieve_posts(self, keyword: str):
-        """ Retrieve all posts in the current blog containing the
-            given keyword (string) in the title or text of the post """
-        if not self.current_blog:
-            return None
-        return self.current_blog.retrieve_posts(keyword)
-    
-    def update_post(self, code: int, title: str, text: str):
-        """ Update a post in the current blog 
-            Checks to make sure user is logged in and user is in
-            the current_blog """
-        if not self.logged_in or not self.current_blog:
-            return False
-        return self.current_blog.update_post(code, title, text)
+            raise NoCurrentBlogException("No current blog selected")
+            
+        return self.current_blog.search_post(post_code)
 
-    def delete_post(self, code: int):
-        """ Delete a post using its code from the current blog
-            Checks to make sure user is logged in and inside of
-            current_blog """
-        if not self.logged_in or not self.current_blog:
-            return False
-        return self.current_blog.delete_post(code)
-    
+    def create_post(self, post_title, post_text):
+        ''' user creates a post in the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to create posts")
+            
+        if not self.current_blog:
+            raise NoCurrentBlogException("No current blog selected")
+            
+        return self.current_blog.create_post(post_title, post_text)
+
+    def retrieve_posts(self, search_term):
+        ''' user retrieves the posts from the current blog that satisfy a search_term '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to retrieve posts")
+            
+        if not self.current_blog:
+            raise NoCurrentBlogException("No current blog selected")
+            
+        return self.current_blog.retrieve_posts(search_term)
+
+    def update_post(self, post_code, new_post_title, new_post_text):
+        ''' user updates a post from the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to update posts")
+            
+        if not self.current_blog:
+            raise NoCurrentBlogException("No current blog selected")
+            
+        return self.current_blog.update_post(post_code, new_post_title, new_post_text)
+
+    def delete_post(self, post_code):
+        ''' user deletes a post from the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to delete posts")
+            
+        if not self.current_blog:
+            raise NoCurrentBlogException("No current blog selected")
+            
+        return self.current_blog.delete_post(post_code)
+
     def list_posts(self):
-        """ Return all posts in the current blog
-            posts are returned in newest to oldest order
-            Checks if user is in the current_blog """
+        ''' user lists all posts from the current blog '''
+        if not self.logged:
+            raise IllegalAccessException("User must be logged in to list posts")
+            
         if not self.current_blog:
-            return None
+            raise NoCurrentBlogException("No current blog selected")
+            
         return self.current_blog.list_posts()
