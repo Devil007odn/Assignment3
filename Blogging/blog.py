@@ -61,4 +61,4 @@ class Blog():
 
     def list_posts(self):
         ''' list all posts from the blog from the more recently added to the least recently added'''
-        return self.post_dao.list_posts()
+        return self.post_dao.delete_post()
